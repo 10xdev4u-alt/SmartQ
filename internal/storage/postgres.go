@@ -33,6 +33,15 @@ type Ticket struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// TicketHistory represents a status change event for a ticket.
+type TicketHistory struct {
+	ID        uuid.UUID `json:"id"`
+	TicketID  uuid.UUID `json:"ticket_id"`
+	Status    string    `json:"status"`
+	Timestamp time.Time `json:"timestamp"`
+	CreatedAt time.Time `json:"created_at"` // Redundant but for consistency
+}
+
 type PostgresDB struct {
 	pool *pgxpool.Pool
 }
@@ -217,6 +226,11 @@ func (db *PostgresDB) CreateTicket(ctx context.Context, queueID uuid.UUID, custo
 		return nil, fmt.Errorf("failed to insert ticket: %w", err)
 	}
 
+	// Log the initial status change
+	if err := db.LogTicketStatusChange(ctx, ticket.ID, ticket.Status); err != nil {
+		return nil, fmt.Errorf("failed to log initial ticket status: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -245,5 +259,29 @@ func (db *PostgresDB) UpdateTicketStatus(ctx context.Context, ticketID uuid.UUID
 		}
 		return nil, fmt.Errorf("failed to update ticket status: %w", err)
 	}
+
+	// Log the status change
+	if err := db.LogTicketStatusChange(ctx, ticket.ID, ticket.Status); err != nil {
+		return nil, fmt.Errorf("failed to log ticket status change: %w", err)
+	}
+
 	return ticket, nil
+}
+
+// LogTicketStatusChange records a ticket's status change in the ticket_history table.
+func (db *PostgresDB) LogTicketStatusChange(ctx context.Context, ticketID uuid.UUID, status string) error {
+	history := &TicketHistory{
+		ID:        uuid.New(),
+		TicketID:  ticketID,
+		Status:    status,
+		Timestamp: time.Now(),
+		CreatedAt: time.Now(),
+	}
+
+	query := `INSERT INTO ticket_history (id, ticket_id, status, timestamp, created_at) VALUES ($1, $2, $3, $4, $5)`
+	_, err := db.pool.Exec(ctx, query, history.ID, history.TicketID, history.Status, history.Timestamp, history.CreatedAt)
+	if err != nil {
+		return fmt.Errorf("failed to log ticket status change: %w", err)
+	}
+	return nil
 }
