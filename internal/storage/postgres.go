@@ -4,10 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/smartq/smartq/internal/config"
+	"github.com/google/uuid" // Import uuid package
 )
+
+// Queue represents a queue in the database.
+type Queue struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+}
 
 type PostgresDB struct {
 	pool *pgxpool.Pool
@@ -37,4 +46,21 @@ func NewPostgresDB(cfg *config.Config) (*PostgresDB, error) {
 func (db *PostgresDB) Close() {
 	db.pool.Close()
 	log.Println("PostgreSQL connection pool closed.")
+}
+
+// CreateQueue inserts a new queue into the database.
+func (db *PostgresDB) CreateQueue(ctx context.Context, name string) (*Queue, error) {
+	queue := &Queue{
+		ID:        uuid.New(),
+		Name:      name,
+		CreatedAt: time.Now(),
+	}
+
+	query := `INSERT INTO queues (id, name, created_at) VALUES ($1, $2, $3) RETURNING id, name, created_at`
+	err := db.pool.QueryRow(ctx, query, queue.ID, queue.Name, queue.CreatedAt).Scan(&queue.ID, &queue.Name, &queue.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert queue: %w", err)
+	}
+
+	return queue, nil
 }

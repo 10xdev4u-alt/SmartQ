@@ -2,9 +2,10 @@ package api
 
 import (
 	"net/http"
+	"time" // Import time package
 
 	"github.com/gin-gonic/gin"
-	"github.com/smartq/smartq/internal/storage" // Import the storage package
+	"github.com/smartq/smartq/internal/storage"
 )
 
 // NewQueue represents the data needed to create a new queue.
@@ -22,14 +23,17 @@ func CreateQueue(db *storage.PostgresDB) gin.HandlerFunc {
 			return
 		}
 
-		// In a real implementation, we would save the new queue to the database here.
-		// For now, we'll just return a dummy response.
-		// TODO: Use db to save the queue
+		// Use the storage layer to create the queue
+		queue, err := db.CreateQueue(c.Request.Context(), newQueue.Name)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create queue"})
+			return
+		}
 
 		c.JSON(http.StatusCreated, gin.H{
-			"id":         "a1b2c3d4-e5f6-7890-1234-567890abcdef", // Dummy UUID
-			"name":       newQueue.Name,
-			"created_at": "2026-01-01T10:00:00Z",              // Dummy timestamp
+			"id":         queue.ID,
+			"name":       queue.Name,
+			"created_at": queue.CreatedAt.Format(time.RFC3339), // Format time for JSON
 		})
 	}
 }
