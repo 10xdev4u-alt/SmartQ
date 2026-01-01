@@ -2,20 +2,19 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/smartq/smartq/internal/storage"
 )
 
-func NewRouter() *gin.Engine {
+func NewRouter(db *storage.PostgresDB) *gin.Engine {
 	router := gin.Default()
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
 		// Queue routes
-		queues := v1.Group("/queues")
-		{
-			queues.POST("/", CreateQueue)
-			// Other queue routes will go here
-		}
+		v1.POST("/queues", CreateQueue(db))
+		// Other queue routes will go here
+
 	}
 
 	return router
