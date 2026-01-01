@@ -352,3 +352,29 @@ func (db *PostgresDB) CalculateEstimatedWaitTime(ctx context.Context, queueID uu
 	averageDurationSeconds := totalDurationSeconds / float64(count)
 	return time.Duration(averageDurationSeconds) * time.Second, nil
 }
+
+// GetQueues retrieves all queues from the database.
+func (db *PostgresDB) GetQueues(ctx context.Context) ([]*Queue, error) {
+	var queues []*Queue
+	query := `SELECT id, name, created_at FROM queues ORDER BY created_at DESC`
+	rows, err := db.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query queues: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		queue := &Queue{}
+		err := rows.Scan(&queue.ID, &queue.Name, &queue.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan queue row: %w", err)
+		}
+		queues = append(queues, queue)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error after iterating rows: %w", err)
+	}
+
+	return queues, nil
+}

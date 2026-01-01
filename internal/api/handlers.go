@@ -165,3 +165,16 @@ func GetEstimatedWaitTime(db *storage.PostgresDB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"estimated_wait_time_seconds": int(waitTime.Seconds())})
 	}
 }
+
+// GetQueues handles retrieving all queues.
+func GetQueues(db *storage.PostgresDB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		queues, err := db.GetQueues(c.Request.Context())
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve queues"})
+			return
+		}
+
+		c.JSON(http.StatusOK, queues)
+	}
+}
