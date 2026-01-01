@@ -2,16 +2,23 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/smartq/smartq/internal/notifier" // Import notifier
 	"github.com/smartq/smartq/internal/storage"
 )
 
-func NewRouter(db *storage.PostgresDB) *gin.Engine {
+// NewRouter sets up the Gin router and its routes.
+func NewRouter(db *storage.PostgresDB, hub *notifier.Hub) *gin.Engine { // Accept hub
 	router := gin.Default()
 
 	// Serve static files for the staff dashboard
 	router.Static("/staff", "./web/staff-dashboard")
 	// Serve static files for the public display
 	router.Static("/display", "./web/public-display")
+
+	// WebSocket endpoint
+	router.GET("/ws", func(c *gin.Context) {
+		notifier.ServeWs(hub, c)
+	})
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
