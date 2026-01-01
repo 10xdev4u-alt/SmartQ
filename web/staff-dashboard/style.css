@@ -1,0 +1,84 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+h1, h2 {
+    color: #0056b3;
+}
+
+#queue-info {
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #e9ecef;
+    border-radius: 4px;
+}
+
+#tickets {
+    list-style: none;
+    padding: 0;
+}
+
+#tickets li {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#tickets li.serving {
+    background-color: #d4edda;
+    border-color: #28a745;
+    font-weight: bold;
+}
+
+#tickets li.served {
+    background-color: #e2e6ea;
+    color: #6c757d;
+    text-decoration: line-through;
+}
+
+#tickets li.cancelled {
+    background-color: #f8d7da;
+    color: #dc3545;
+    text-decoration: line-through;
+}
+
+.ticket-actions button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9em;
+    margin-left: 5px;
+}
+
+.ticket-actions button:hover {
+    background-color: #0056b3;
+}
+
+.ticket-actions button.cancel {
+    background-color: #dc3545;
+}
+
+.ticket-actions button.cancel:hover {
+    background-color: #c82333;
+}

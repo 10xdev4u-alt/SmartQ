@@ -8,6 +8,9 @@ import (
 func NewRouter(db *storage.PostgresDB) *gin.Engine {
 	router := gin.Default()
 
+	// Serve static files for the staff dashboard
+	router.Static("/staff", "./web/staff-dashboard")
+
 	// API v1 routes
 	v1 := router.Group("/api/v1")
 	{
@@ -25,11 +28,6 @@ func NewRouter(db *storage.PostgresDB) *gin.Engine {
 			tickets.POST("/:ticketId/serve", updateTicketStatusHandler(db, "served"))
 			tickets.POST("/:ticketId/cancel", updateTicketStatusHandler(db, "cancelled"))
 		}
-
-
-
-
-
 	}
 
 	return router
