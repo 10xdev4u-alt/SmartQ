@@ -15,7 +15,9 @@ func NewRouter(db *storage.PostgresDB) *gin.Engine {
 		v1.POST("/queues", CreateQueue(db))
 		v1.GET("/queues/:queueId", GetQueue(db))
 		v1.GET("/queues/:queueId/tickets", GetTickets(db))
+		v1.POST("/queues/:queueId/tickets", CreateTicket(db))
 		// Other queue routes will go here
+
 
 
 

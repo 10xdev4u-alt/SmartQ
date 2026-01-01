@@ -83,3 +83,35 @@ func GetTickets(db *storage.PostgresDB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, tickets)
 	}
 }
+
+// NewTicketRequest represents the data needed to create a new ticket.
+type NewTicketRequest struct {
+	CustomerName  string `json:"customer_name" binding:"required"`
+	CustomerPhone string `json:"customer_phone" binding:"required"`
+}
+
+// CreateTicket handles the creation of a new ticket for a given queue.
+func CreateTicket(db *storage.PostgresDB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		queueIDStr := c.Param("queueId")
+		queueID, err := uuid.Parse(queueIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid queue ID format"})
+			return
+		}
+
+		var req NewTicketRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		ticket, err := db.CreateTicket(c.Request.Context(), queueID, req.CustomerName, req.CustomerPhone)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create ticket"})
+			return
+		}
+
+		c.JSON(http.StatusCreated, ticket)
+	}
+}

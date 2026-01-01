@@ -131,3 +131,94 @@ func (db *PostgresDB) GetTicketsByQueueID(ctx context.Context, queueID uuid.UUID
 
 	return tickets, nil
 }
+
+// CreateTicket inserts a new ticket into the database.
+func (db *PostgresDB) CreateTicket(ctx context.Context, queueID uuid.UUID, customerName, customerPhone string) (*Ticket, error) {
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) // Rollback on error, commit on success
+
+	// Get the next ticket number and position
+	var lastTicketNumber string
+	var lastPosition int
+	
+	// Query for the last ticket number and position for the given queue on the current day
+	// This query needs to be robust to handle cases where there are no tickets yet
+	// For simplicity, let's assume ticket numbers are sequential per day per queue
+	// and positions are also sequential.
+	
+	// Get last ticket number
+	err = tx.QueryRow(ctx, `
+		SELECT COALESCE(MAX(ticket_number), 'A-000')
+		FROM tickets
+		WHERE queue_id = $1 AND created_at::date = NOW()::date`, queueID).Scan(&lastTicketNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last ticket number: %w", err)
+	}
+
+	// Get last position
+	err = tx.QueryRow(ctx, `
+		SELECT COALESCE(MAX(position), 0)
+		FROM tickets
+		WHERE queue_id = $1`, queueID).Scan(&lastPosition)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last position: %w", err)
+	}
+
+	// Generate next ticket number
+	prefix := string(lastTicketNumber[0]) // Assuming 'A'
+	numStr := lastTicketNumber[2:]        // Assuming '000'
+	num, err := strconv.Atoi(numStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ticket number: %w", err)
+	}
+	nextTicketNumber := fmt.Sprintf("%s-%03d", prefix, num+1)
+	nextPosition := lastPosition + 1
+
+	ticket := &Ticket{
+		ID:           uuid.New(),
+		QueueID:      queueID,
+		CustomerName: customerName,
+		CustomerPhone: customerPhone,
+		TicketNumber: nextTicketNumber,
+		Status:       "waiting", // Default status
+		Position:     nextPosition,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	query := `INSERT INTO tickets (id, queue_id, customer_name, customer_phone, ticket_number, status, position, created_at, updated_at)
+			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, queue_id, customer_name, customer_phone, ticket_number, status, position, created_at, updated_at`
+	err = tx.QueryRow(ctx, query,
+		ticket.ID,
+		ticket.QueueID,
+		ticket.CustomerName,
+		ticket.CustomerPhone,
+		ticket.TicketNumber,
+		ticket.Status,
+		ticket.Position,
+		ticket.CreatedAt,
+		ticket.UpdatedAt,
+	).Scan(
+		&ticket.ID,
+		&ticket.QueueID,
+		&ticket.CustomerName,
+		&ticket.CustomerPhone,
+		&ticket.TicketNumber,
+		&ticket.Status,
+		&ticket.Position,
+		&ticket.CreatedAt,
+		&ticket.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert ticket: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return ticket, nil
+}
