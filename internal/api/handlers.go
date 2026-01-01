@@ -88,6 +88,7 @@ func GetTickets(db *storage.PostgresDB) gin.HandlerFunc {
 type NewTicketRequest struct {
 	CustomerName  string `json:"customer_name" binding:"required"`
 	CustomerPhone string `json:"customer_phone" binding:"required"`
+	Priority      int    `json:"priority"` // New field for priority, optional
 }
 
 // CreateTicket handles the creation of a new ticket for a given queue.
@@ -106,7 +107,12 @@ func CreateTicket(db *storage.PostgresDB) gin.HandlerFunc {
 			return
 		}
 
-		ticket, err := db.CreateTicket(c.Request.Context(), queueID, req.CustomerName, req.CustomerPhone)
+		// Default priority if not provided
+		if req.Priority == 0 {
+			req.Priority = 0 // Default to normal priority
+		}
+
+		ticket, err := db.CreateTicket(c.Request.Context(), queueID, req.CustomerName, req.CustomerPhone, req.Priority)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create ticket"})
 			return

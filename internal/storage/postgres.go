@@ -29,6 +29,7 @@ type Ticket struct {
 	TicketNumber string    `json:"ticket_number"`
 	Status       string    `json:"status"`
 	Position     int       `json:"position"`
+	Priority     int       `json:"priority"` // New field for priority
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -106,10 +107,10 @@ func (db *PostgresDB) GetQueueByID(ctx context.Context, id uuid.UUID) (*Queue, e
 // GetTicketsByQueueID retrieves all tickets for a given queue ID.
 func (db *PostgresDB) GetTicketsByQueueID(ctx context.Context, queueID uuid.UUID) ([]*Ticket, error) {
 	var tickets []*Ticket
-	query := `SELECT id, queue_id, customer_name, customer_phone, ticket_number, status, position, created_at, updated_at
+	query := `SELECT id, queue_id, customer_name, customer_phone, ticket_number, status, position, priority, created_at, updated_at
 			  FROM tickets
 			  WHERE queue_id = $1
-			  ORDER BY position ASC, created_at ASC`
+			  ORDER BY priority DESC, position ASC, created_at ASC` // Order by priority (higher value = higher priority)
 	rows, err := db.pool.Query(ctx, query, queueID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tickets: %w", err)
@@ -126,6 +127,7 @@ func (db *PostgresDB) GetTicketsByQueueID(ctx context.Context, queueID uuid.UUID
 			&ticket.TicketNumber,
 			&ticket.Status,
 			&ticket.Position,
+			&ticket.Priority, // Scan priority
 			&ticket.CreatedAt,
 			&ticket.UpdatedAt,
 		)
@@ -143,7 +145,7 @@ func (db *PostgresDB) GetTicketsByQueueID(ctx context.Context, queueID uuid.UUID
 }
 
 // CreateTicket inserts a new ticket into the database.
-func (db *PostgresDB) CreateTicket(ctx context.Context, queueID uuid.UUID, customerName, customerPhone string) (*Ticket, error) {
+func (db *PostgresDB) CreateTicket(ctx context.Context, queueID uuid.UUID, customerName, customerPhone string, priority int) (*Ticket, error) {
 	tx, err := db.pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
@@ -195,12 +197,13 @@ func (db *PostgresDB) CreateTicket(ctx context.Context, queueID uuid.UUID, custo
 		TicketNumber: nextTicketNumber,
 		Status:       "waiting", // Default status
 		Position:     nextPosition,
+		Priority:     priority, // Set priority
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
 
-	query := `INSERT INTO tickets (id, queue_id, customer_name, customer_phone, ticket_number, status, position, created_at, updated_at)
-			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, queue_id, customer_name, customer_phone, ticket_number, status, position, created_at, updated_at`
+	query := `INSERT INTO tickets (id, queue_id, customer_name, customer_phone, ticket_number, status, position, priority, created_at, updated_at)
+			  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, queue_id, customer_name, customer_phone, ticket_number, status, position, priority, created_at, updated_at`
 	err = tx.QueryRow(ctx, query,
 		ticket.ID,
 		ticket.QueueID,
@@ -209,6 +212,7 @@ func (db *PostgresDB) CreateTicket(ctx context.Context, queueID uuid.UUID, custo
 		ticket.TicketNumber,
 		ticket.Status,
 		ticket.Position,
+		ticket.Priority, // Add priority to insert
 		ticket.CreatedAt,
 		ticket.UpdatedAt,
 	).Scan(
@@ -219,6 +223,7 @@ func (db *PostgresDB) CreateTicket(ctx context.Context, queueID uuid.UUID, custo
 		&ticket.TicketNumber,
 		&ticket.Status,
 		&ticket.Position,
+		&ticket.Priority, // Add priority to scan
 		&ticket.CreatedAt,
 		&ticket.UpdatedAt,
 	)
