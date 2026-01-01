@@ -10,6 +10,8 @@ func NewRouter(db *storage.PostgresDB) *gin.Engine {
 
 	// Serve static files for the staff dashboard
 	router.Static("/staff", "./web/staff-dashboard")
+	// Serve static files for the public display
+	router.Static("/display", "./web/public-display")
 
 	// API v1 routes
 	v1 := router.Group("/api/v1")
