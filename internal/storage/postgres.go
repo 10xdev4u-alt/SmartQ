@@ -227,7 +227,7 @@ func (db *PostgresDB) CreateTicket(ctx context.Context, queueID uuid.UUID, custo
 	}
 
 	// Log the initial status change
-	if err := db.LogTicketStatusChange(ctx, ticket.ID, ticket.Status); err != nil {
+	if err := LogTicketStatusChange(ctx, tx, ticket.ID, ticket.Status); err != nil {
 		return nil, fmt.Errorf("failed to log initial ticket status: %w", err)
 	}
 
@@ -240,9 +240,15 @@ func (db *PostgresDB) CreateTicket(ctx context.Context, queueID uuid.UUID, custo
 
 // UpdateTicketStatus updates the status of a ticket.
 func (db *PostgresDB) UpdateTicketStatus(ctx context.Context, ticketID uuid.UUID, status string) (*Ticket, error) {
+	tx, err := db.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
 	ticket := &Ticket{}
 	query := `UPDATE tickets SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id, queue_id, customer_name, customer_phone, ticket_number, status, position, created_at, updated_at`
-	err := db.pool.QueryRow(ctx, query, status, ticketID).Scan(
+	err = tx.QueryRow(ctx, query, status, ticketID).Scan(
 		&ticket.ID,
 		&ticket.QueueID,
 		&ticket.CustomerName,
@@ -261,15 +267,19 @@ func (db *PostgresDB) UpdateTicketStatus(ctx context.Context, ticketID uuid.UUID
 	}
 
 	// Log the status change
-	if err := db.LogTicketStatusChange(ctx, ticket.ID, ticket.Status); err != nil {
+	if err := LogTicketStatusChange(ctx, tx, ticket.ID, ticket.Status); err != nil {
 		return nil, fmt.Errorf("failed to log ticket status change: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return ticket, nil
 }
 
 // LogTicketStatusChange records a ticket's status change in the ticket_history table.
-func (db *PostgresDB) LogTicketStatusChange(ctx context.Context, ticketID uuid.UUID, status string) error {
+func LogTicketStatusChange(ctx context.Context, tx pgx.Tx, ticketID uuid.UUID, status string) error {
 	history := &TicketHistory{
 		ID:        uuid.New(),
 		TicketID:  ticketID,
@@ -279,7 +289,7 @@ func (db *PostgresDB) LogTicketStatusChange(ctx context.Context, ticketID uuid.U
 	}
 
 	query := `INSERT INTO ticket_history (id, ticket_id, status, timestamp, created_at) VALUES ($1, $2, $3, $4, $5)`
-	_, err := db.pool.Exec(ctx, query, history.ID, history.TicketID, history.Status, history.Timestamp, history.CreatedAt)
+	_, err := tx.Exec(ctx, query, history.ID, history.TicketID, history.Status, history.Timestamp, history.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to log ticket status change: %w", err)
 	}
