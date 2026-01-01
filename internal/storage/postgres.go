@@ -8,7 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/smartq/smartq/internal/config"
-	"github.com/google/uuid" // Import uuid package
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5" // Import pgx for pgx.ErrNoRows
 )
 
 // Queue represents a queue in the database.
@@ -62,5 +63,19 @@ func (db *PostgresDB) CreateQueue(ctx context.Context, name string) (*Queue, err
 		return nil, fmt.Errorf("failed to insert queue: %w", err)
 	}
 
+	return queue, nil
+}
+
+// GetQueueByID retrieves a queue from the database by its ID.
+func (db *PostgresDB) GetQueueByID(ctx context.Context, id uuid.UUID) (*Queue, error) {
+	queue := &Queue{}
+	query := `SELECT id, name, created_at FROM queues WHERE id = $1`
+	err := db.pool.QueryRow(ctx, query, id).Scan(&queue.ID, &queue.Name, &queue.CreatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("queue with ID %s not found", id.String())
+		}
+		return nil, fmt.Errorf("failed to get queue by ID: %w", err)
+	}
 	return queue, nil
 }

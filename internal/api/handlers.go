@@ -1,10 +1,12 @@
 package api
 
 import (
+	"fmt" // Import fmt package for error formatting
 	"net/http"
-	"time" // Import time package
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid" // Import uuid package
 	"github.com/smartq/smartq/internal/storage"
 )
 
@@ -35,5 +37,29 @@ func CreateQueue(db *storage.PostgresDB) gin.HandlerFunc {
 			"name":       queue.Name,
 			"created_at": queue.CreatedAt.Format(time.RFC3339), // Format time for JSON
 		})
+	}
+}
+
+// GetQueue handles retrieving a queue by its ID.
+func GetQueue(db *storage.PostgresDB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		queueIDStr := c.Param("queueId")
+		queueID, err := uuid.Parse(queueIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid queue ID format"})
+			return
+		}
+
+		queue, err := db.GetQueueByID(c.Request.Context(), queueID)
+		if err != nil {
+			if err.Error() == fmt.Sprintf("queue with ID %s not found", queueID.String()) {
+				c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve queue"})
+			return
+		}
+
+		c.JSON(http.StatusOK, queue)
 	}
 }
