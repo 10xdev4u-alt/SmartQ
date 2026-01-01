@@ -139,3 +139,23 @@ func updateTicketStatusHandler(db *storage.PostgresDB, status string) gin.Handle
 		c.JSON(http.StatusOK, ticket)
 	}
 }
+
+// GetEstimatedWaitTime handles retrieving the estimated wait time for a given queue.
+func GetEstimatedWaitTime(db *storage.PostgresDB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		queueIDStr := c.Param("queueId")
+		queueID, err := uuid.Parse(queueIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid queue ID format"})
+			return
+		}
+
+		waitTime, err := db.CalculateEstimatedWaitTime(c.Request.Context(), queueID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to calculate estimated wait time"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"estimated_wait_time_seconds": int(waitTime.Seconds())})
+	}
+}

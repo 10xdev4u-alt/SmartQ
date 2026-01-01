@@ -285,3 +285,55 @@ func (db *PostgresDB) LogTicketStatusChange(ctx context.Context, ticketID uuid.U
 	}
 	return nil
 }
+
+// CalculateEstimatedWaitTime calculates the estimated wait time for a given queue.
+// It does this by looking at the average time tickets spent in 'waiting' status
+// for recently served tickets in that queue.
+func (db *PostgresDB) CalculateEstimatedWaitTime(ctx context.Context, queueID uuid.UUID) (time.Duration, error) {
+	// For simplicity, let's consider the last 10 served tickets to calculate average waiting time.
+	// A more sophisticated algorithm might consider time of day, day of week, etc.
+	query := `
+		SELECT
+			EXTRACT(EPOCH FROM (th_served.timestamp - th_waiting.timestamp)) AS waiting_duration
+		FROM
+			tickets t
+		JOIN
+			ticket_history th_waiting ON t.id = th_waiting.ticket_id AND th_waiting.status = 'waiting'
+		JOIN
+			ticket_history th_served ON t.id = th_served.ticket_id AND th_served.status = 'served'
+		WHERE
+			t.queue_id = $1
+			AND t.status = 'served' -- Only consider served tickets for historical data
+		ORDER BY
+			th_served.timestamp DESC
+		LIMIT 10
+	`
+
+	rows, err := db.pool.Query(ctx, query, queueID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query waiting durations: %w", err)
+	}
+	defer rows.Close()
+
+	var totalDurationSeconds float64
+	var count int
+	for rows.Next() {
+		var duration float64
+		if err := rows.Scan(&duration); err != nil {
+			return 0, fmt.Errorf("failed to scan waiting duration: %w", err)
+		}
+		totalDurationSeconds += duration
+		count++
+	}
+
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("error after iterating rows: %w", err)
+	}
+
+	if count == 0 {
+		return 0, nil // No historical data, so 0 wait time
+	}
+
+	averageDurationSeconds := totalDurationSeconds / float64(count)
+	return time.Duration(averageDurationSeconds) * time.Second, nil
+}
