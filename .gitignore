@@ -17,3 +17,5 @@
 # Go workspace file
 go.work
 go.work.sum
+commitsledger.sh
+the-ai-dev.sh
