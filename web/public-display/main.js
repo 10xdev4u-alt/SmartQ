@@ -1,4 +1,5 @@
 const API_BASE_URL = 'http://localhost:8080/api/v1';
+const WS_BASE_URL = 'ws://localhost:8080/ws'; // WebSocket URL
 let currentQueueId = ''; // This should be set dynamically, e.g., from URL or config
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -8,8 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (currentQueueId) {
         fetchQueueTickets(currentQueueId);
-        // Set up polling for updates
-        setInterval(() => fetchQueueTickets(currentQueueId), 3000); // Poll every 3 seconds
+        setupWebSocket(); // Setup WebSocket instead of polling
     } else {
         document.getElementById('serving-ticket').textContent = 'Queue not selected.';
         document.getElementById('waiting-tickets').innerHTML = '<li>Queue not selected.</li>';
@@ -29,6 +29,41 @@ async function fetchQueueTickets(queueId) {
         document.getElementById('serving-ticket').textContent = 'Error loading.';
         document.getElementById('waiting-tickets').innerHTML = '<li>Error loading tickets.</li>';
     }
+}
+
+function setupWebSocket() {
+    const socket = new WebSocket(WS_BASE_URL);
+
+    socket.onopen = (event) => {
+        console.log('WebSocket connected:', event);
+    };
+
+    socket.onmessage = (event) => {
+        const message = JSON.parse(event.data);
+        console.log('WebSocket message received:', message);
+
+        if (message.type === 'ticket_update') {
+            // Re-fetch all tickets for the current queue to ensure consistency
+            // A more optimized approach would be to update individual tickets in the DOM
+            // but for simplicity, re-fetching is sufficient for now.
+            fetchQueueTickets(currentQueueId);
+        } else if (message.type === 'queue_update') {
+            // If a queue update is received, and it's relevant to our current queue,
+            // we might want to re-fetch queue details or tickets.
+            // For now, we'll just log it.
+            console.log('Queue update received:', message.data);
+        }
+    };
+
+    socket.onclose = (event) => {
+        console.log('WebSocket disconnected:', event);
+        // Attempt to reconnect after a delay
+        setTimeout(setupWebSocket, 3000);
+    };
+
+    socket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+    };
 }
 
 function renderTickets(tickets) {
