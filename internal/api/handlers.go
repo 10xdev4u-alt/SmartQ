@@ -63,3 +63,23 @@ func GetQueue(db *storage.PostgresDB) gin.HandlerFunc {
 		c.JSON(http.StatusOK, queue)
 	}
 }
+
+// GetTickets handles retrieving all tickets for a given queue ID.
+func GetTickets(db *storage.PostgresDB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		queueIDStr := c.Param("queueId")
+		queueID, err := uuid.Parse(queueIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid queue ID format"})
+			return
+		}
+
+		tickets, err := db.GetTicketsByQueueID(c.Request.Context(), queueID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve tickets"})
+			return
+		}
+
+		c.JSON(http.StatusOK, tickets)
+	}
+}

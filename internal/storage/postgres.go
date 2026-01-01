@@ -19,6 +19,19 @@ type Queue struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// Ticket represents a ticket in the database.
+type Ticket struct {
+	ID           uuid.UUID `json:"id"`
+	QueueID      uuid.UUID `json:"queue_id"`
+	CustomerName string    `json:"customer_name"`
+	CustomerPhone string   `json:"customer_phone"`
+	TicketNumber string    `json:"ticket_number"`
+	Status       string    `json:"status"`
+	Position     int       `json:"position"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type PostgresDB struct {
 	pool *pgxpool.Pool
 }
@@ -78,4 +91,43 @@ func (db *PostgresDB) GetQueueByID(ctx context.Context, id uuid.UUID) (*Queue, e
 		return nil, fmt.Errorf("failed to get queue by ID: %w", err)
 	}
 	return queue, nil
+}
+
+// GetTicketsByQueueID retrieves all tickets for a given queue ID.
+func (db *PostgresDB) GetTicketsByQueueID(ctx context.Context, queueID uuid.UUID) ([]*Ticket, error) {
+	var tickets []*Ticket
+	query := `SELECT id, queue_id, customer_name, customer_phone, ticket_number, status, position, created_at, updated_at
+			  FROM tickets
+			  WHERE queue_id = $1
+			  ORDER BY position ASC, created_at ASC`
+	rows, err := db.pool.Query(ctx, query, queueID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tickets: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		ticket := &Ticket{}
+		err := rows.Scan(
+			&ticket.ID,
+			&ticket.QueueID,
+			&ticket.CustomerName,
+			&ticket.CustomerPhone,
+			&ticket.TicketNumber,
+			&ticket.Status,
+			&ticket.Position,
+			&ticket.CreatedAt,
+			&ticket.UpdatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan ticket row: %w", err)
+		}
+		tickets = append(tickets, ticket)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error after iterating rows: %w", err)
+	}
+
+	return tickets, nil
 }
