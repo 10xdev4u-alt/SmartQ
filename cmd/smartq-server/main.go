@@ -19,10 +19,7 @@ import (
 )
 
 func main() {
-	cfg, err := config.LoadConfig() // Load config first
-	if err != nil {
-		log.Fatalf("Error loading configuration: %v", err)
-	}
+	cfg := config.LoadConfig() // Load config first
 
 	// Run database migrations
 	runMigrations(cfg.DatabaseURL)
@@ -37,7 +34,10 @@ func main() {
 	hub := notifier.NewHub()
 	go hub.Run()
 
-	router := api.NewRouter(db, hub) // Pass the hub to the router
+	// Create a Notifier instance
+	n := notifier.NewNotifier(hub)
+
+	router := api.NewRouter(db, hub, n) // Pass the hub and notifier to the router
 
 	// Start HTTP server
 	srv := &http.Server{
