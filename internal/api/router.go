@@ -18,6 +18,15 @@ func NewRouter(db *storage.PostgresDB) *gin.Engine {
 		v1.POST("/queues/:queueId/tickets", CreateTicket(db))
 		// Other queue routes will go here
 
+		// Ticket routes
+		tickets := v1.Group("/tickets")
+		{
+			tickets.POST("/:ticketId/call", updateTicketStatusHandler(db, "serving"))
+			tickets.POST("/:ticketId/serve", updateTicketStatusHandler(db, "served"))
+			tickets.POST("/:ticketId/cancel", updateTicketStatusHandler(db, "cancelled"))
+		}
+
+
 
 
 

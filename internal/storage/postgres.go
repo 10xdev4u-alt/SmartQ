@@ -223,3 +223,27 @@ func (db *PostgresDB) CreateTicket(ctx context.Context, queueID uuid.UUID, custo
 
 	return ticket, nil
 }
+
+// UpdateTicketStatus updates the status of a ticket.
+func (db *PostgresDB) UpdateTicketStatus(ctx context.Context, ticketID uuid.UUID, status string) (*Ticket, error) {
+	ticket := &Ticket{}
+	query := `UPDATE tickets SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id, queue_id, customer_name, customer_phone, ticket_number, status, position, created_at, updated_at`
+	err := db.pool.QueryRow(ctx, query, status, ticketID).Scan(
+		&ticket.ID,
+		&ticket.QueueID,
+		&ticket.CustomerName,
+		&ticket.CustomerPhone,
+		&ticket.TicketNumber,
+		&ticket.Status,
+		&ticket.Position,
+		&ticket.CreatedAt,
+		&ticket.UpdatedAt,
+	)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("ticket with ID %s not found", ticketID.String())
+		}
+		return nil, fmt.Errorf("failed to update ticket status: %w", err)
+	}
+	return ticket, nil
+}

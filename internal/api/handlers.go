@@ -115,3 +115,27 @@ func CreateTicket(db *storage.PostgresDB) gin.HandlerFunc {
 		c.JSON(http.StatusCreated, ticket)
 	}
 }
+
+// updateTicketStatusHandler is a generic handler for updating a ticket's status.
+func updateTicketStatusHandler(db *storage.PostgresDB, status string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ticketIDStr := c.Param("ticketId")
+		ticketID, err := uuid.Parse(ticketIDStr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ticket ID format"})
+			return
+		}
+
+		ticket, err := db.UpdateTicketStatus(c.Request.Context(), ticketID, status)
+		if err != nil {
+			if err.Error() == fmt.Sprintf("ticket with ID %s not found", ticketID.String()) {
+				c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update ticket status"})
+			return
+		}
+
+		c.JSON(http.StatusOK, ticket)
+	}
+}
