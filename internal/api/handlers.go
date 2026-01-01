@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid" // Import uuid package
+	"github.com/smartq/smartq/internal/notifier" // Import notifier
 	"github.com/smartq/smartq/internal/storage"
 )
 
@@ -17,7 +18,7 @@ type NewQueue struct {
 
 // CreateQueue handles the creation of a new queue.
 // It now returns a gin.HandlerFunc closure to capture the *storage.PostgresDB instance.
-func CreateQueue(db *storage.PostgresDB) gin.HandlerFunc {
+func CreateQueue(db *storage.PostgresDB, n *notifier.Notifier) gin.HandlerFunc { // Accept notifier
 	return func(c *gin.Context) {
 		var newQueue NewQueue
 		if err := c.ShouldBindJSON(&newQueue); err != nil {
@@ -35,8 +36,11 @@ func CreateQueue(db *storage.PostgresDB) gin.HandlerFunc {
 		c.JSON(http.StatusCreated, gin.H{
 			"id":         queue.ID,
 			"name":       queue.Name,
-			"created_at": queue.CreatedAt.Format(time.RFC3339), // Format time for JSON
+			"created_at": queue.CreatedAt.Format(time.RFC3339),
 		})
+
+		// Send WebSocket update
+		n.SendQueueUpdate(queue)
 	}
 }
 
@@ -92,7 +96,7 @@ type NewTicketRequest struct {
 }
 
 // CreateTicket handles the creation of a new ticket for a given queue.
-func CreateTicket(db *storage.PostgresDB) gin.HandlerFunc {
+func CreateTicket(db *storage.PostgresDB, n *notifier.Notifier) gin.HandlerFunc { // Accept notifier
 	return func(c *gin.Context) {
 		queueIDStr := c.Param("queueId")
 		queueID, err := uuid.Parse(queueIDStr)
@@ -119,11 +123,14 @@ func CreateTicket(db *storage.PostgresDB) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusCreated, ticket)
+
+		// Send WebSocket update
+		n.SendTicketUpdate(ticket)
 	}
 }
 
 // updateTicketStatusHandler is a generic handler for updating a ticket's status.
-func updateTicketStatusHandler(db *storage.PostgresDB, status string) gin.HandlerFunc {
+func updateTicketStatusHandler(db *storage.PostgresDB, n *notifier.Notifier, status string) gin.HandlerFunc { // Accept notifier
 	return func(c *gin.Context) {
 		ticketIDStr := c.Param("ticketId")
 		ticketID, err := uuid.Parse(ticketIDStr)
@@ -143,6 +150,9 @@ func updateTicketStatusHandler(db *storage.PostgresDB, status string) gin.Handle
 		}
 
 		c.JSON(http.StatusOK, ticket)
+
+		// Send WebSocket update
+		n.SendTicketUpdate(ticket)
 	}
 }
 
